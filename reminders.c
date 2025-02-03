@@ -5,8 +5,26 @@
 #include <stdlib.h>
 #include <regex.h>
 
-// int validate_regex()
+// finding if the reminder message contains a date, if so, we add this date to the reminder
+int regex_contains_date(char *message, regmatch_t *match, regex_t regex) {
+     int regex_result;
 
+            const char *pattern = "([0-9]{1,2}/[0-9]{1,2}(/[0-9]{4})?)";
+
+            // Compile regex
+            regex_result = regcomp(&regex, pattern, REG_EXTENDED);
+            if (regex_result) {
+                printf("Could not compile regex\n");
+                return 0;
+            }
+
+            // Execute regex
+            return regexec(&regex, message, 1, match, 0);
+
+
+}
+
+//After we process a reminder message, we want to mark it as read so that we don't process a reminder message more than once
 void mark_message_as_read(sqlite3 *db, int message_id) {
     sqlite3_stmt *stmt;
     int rc;
@@ -35,10 +53,11 @@ int main() {
     int rc;
     time_t t;
     regex_t regex;
-    int reti;
     regmatch_t match[1]; // Stores the position of the match
 
     time(&t); // Get current time
+
+    printf("starting!!!");
 
     rc = sqlite3_open("/Users/ratikgambhir/Library/Messages/chat.db", &db);
     if (rc != SQLITE_OK) {
@@ -67,7 +86,6 @@ int main() {
     }
 
     sqlite3_bind_int64(stmt, 1, reminder_window);
-
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         const unsigned char *text = sqlite3_column_text(stmt, 0);
         int message_id = sqlite3_column_int(stmt, 1);
@@ -82,10 +100,12 @@ int main() {
                 continue; // Skip this row if allocation fails
             }
 
-            printf("Number: %s\n", (const char *)number);
+            printf("Message from number: %s\n", (const char *)number);
             strcpy(message, (char *)text);
 
             char command[256];
+
+            //Ideally here we would like to query the sqlite db that has contact info, but ICloud was giving me trouble
             snprintf(command, sizeof(command),
                      "osascript -e 'tell application \"Contacts\" to get name of first person whose value of phones contains \"%s\"'",
                      (const char *)number);
@@ -98,45 +118,33 @@ int main() {
 
             char buffer[128];
             if (fgets(buffer, sizeof(buffer), fp) != NULL) {
-                printf("Contact Name: %s", buffer);
+                printf("Contact name found: %s", buffer);
             } else {
                 printf("No contact name found\n");
             }
 
-            const char *found = strcasestr(message, "reminder");
+            const char *found = strcasestr(message, "Reminder:");
 
-            // Regex pattern for MM/DD or MM/DD/YYYY
-            const char *pattern = "([0-9]{1,2}/[0-9]{1,2}(/[0-9]{4})?)";
-
-            // Compile regex
-            reti = regcomp(&regex, pattern, REG_EXTENDED);
-            if (reti) {
-                printf("Could not compile regex\n");
-                return 0;
-            }
-
-            // Execute regex
-            reti = regexec(&regex, message, 1, match, 0);
-            printf("match regex: %d\n", reti);
+            int date_found = regex_contains_date(message, match, regex);
 
             if (found != NULL) {
                 char command[512];
-                found += strlen("reminder");
-                printf("Message: %s\n", found);
+                found += strlen("Reminder:") + 1;
+                printf("Message reminder: %s\n", found);
 
-                if (reti == 1) {
+                if (date_found == 1) {
                     snprintf(command, sizeof(command),
                              "osascript -e 'tell application \"Reminders\" to make new reminder at list \"Reminders\" "
                              "with properties {name:\"%s\", body:\"%s\"}'",
                              found, buffer);
                 } else {
-                    char extracted_date[50] = ""; // Store extracted date
+                    char extracted_date[50] = ""; 
                     int start = match[0].rm_so;
                     int end = match[0].rm_eo;
                     int match_len = end - start;
 
                     strncpy(extracted_date, message + start, match_len);
-                    extracted_date[match_len] = '\0'; // Null-terminate the string
+                    extracted_date[match_len] = '\0'; 
 
                     snprintf(command, sizeof(command),
                              "osascript -e 'tell application \"Reminders\" to make new reminder at list \"Reminders\" "
@@ -154,6 +162,5 @@ int main() {
 
     sqlite3_finalize(stmt);
     sqlite3_close(db);
-    printf("Hello, World!\n");
     return 0;
 }
