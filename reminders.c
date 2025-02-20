@@ -28,9 +28,9 @@ int regex_contains_date(char *message, regmatch_t *match, regex_t regex) {
 int regex_contains_time(char *message, regmatch_t *match, regex_t regex) {
      int regex_result;
 
-            const char *pattern = "([0-9]:?[0-9][0-9][AaPp][Mm])";
+            const char *pattern = "[0-9]{1,2}(:)?([0-9]{2})?(\\s*)?[AaPp][Mm]";
 
-            regex_result = regcomp(&regex, pattern, REG_EXTENDED);
+            regex_result = regcomp(&regex, pattern, REG_EXTENDED | REG_ICASE);
             if (regex_result) {
                 printf("Could not compile regex\n");
                 return 0;
@@ -71,6 +71,7 @@ int main() {
     int rc;
     time_t t;
     regex_t regex;
+    regex_t time_regex;
     regmatch_t match[1]; // Stores the position of the match
     regmatch_t time_match[1]; // Stores the position of the match
 
@@ -145,7 +146,7 @@ int main() {
             const char *found = strcasestr(message, "Reminder:");
 
             int date_found = regex_contains_date(message, match, regex);
-            int time = regex_contains_time(message, time_match, regex);
+            int time = regex_contains_time(message, time_match, time_regex);
 
             if (found != NULL) {
                 char command[512];
@@ -161,9 +162,12 @@ int main() {
 
                 printf("Formatted Date: %s\n", formatted_date);
 
+                printf("Date Found: %d\n", date_found);
+                printf("time found: %d\n",time);
+
         //Do switch statement here for all the diff cases
                 if (date_found == 1) {
-                    printf("No date FOUND");
+               
                     if(time == 1) {
 
                         printf("No date and time found");
@@ -173,7 +177,7 @@ int main() {
                              "with properties {name:\"%s\", due date:date \"%s\", body:\"%s\"}'",
                              found, formatted_date, buffer);
                     } else {
-                            printf("No date but time found");
+                          
                     // TODO add time column is a time exists in message
                     char extracted_time[50] = ""; 
                     int start = time_match[0].rm_so;
@@ -182,7 +186,7 @@ int main() {
                     strncpy(extracted_time, message + start, match_len);
                     extracted_time[match_len] = '\0';
 
-                                            printf("No date but time found");
+                                            printf("No date but time found!!!!!!!");
 
 
                     snprintf(command, sizeof(command),
