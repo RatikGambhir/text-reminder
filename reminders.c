@@ -11,14 +11,32 @@ int regex_contains_date(char *message, regmatch_t *match, regex_t regex) {
 
             const char *pattern = "([0-9]{1,2}/[0-9]{1,2}(/[0-9]{4})?)";
 
-            // Compile regex
+            
             regex_result = regcomp(&regex, pattern, REG_EXTENDED);
             if (regex_result) {
                 printf("Could not compile regex\n");
                 return 0;
             }
 
-            // Execute regex
+           
+            return regexec(&regex, message, 1, match, 0);
+
+
+}
+
+// time regex. Finding if the text contains 8:30PM or 830PM format. PM or AM must be directly after the time
+int regex_contains_time(char *message, regmatch_t *match, regex_t regex) {
+     int regex_result;
+
+            const char *pattern = "([0-9]:?[0-9][0-9][AaPp][Mm])";
+
+            regex_result = regcomp(&regex, pattern, REG_EXTENDED);
+            if (regex_result) {
+                printf("Could not compile regex\n");
+                return 0;
+            }
+
+        
             return regexec(&regex, message, 1, match, 0);
 
 
@@ -54,10 +72,11 @@ int main() {
     time_t t;
     regex_t regex;
     regmatch_t match[1]; // Stores the position of the match
+    regmatch_t time_match[1]; // Stores the position of the match
+
 
     time(&t); // Get current time
 
-    printf("starting!!!");
 
     rc = sqlite3_open("/Users/ratikgambhir/Library/Messages/chat.db", &db);
     if (rc != SQLITE_OK) {
@@ -126,37 +145,80 @@ int main() {
             const char *found = strcasestr(message, "Reminder:");
 
             int date_found = regex_contains_date(message, match, regex);
+            int time = regex_contains_time(message, time_match, regex);
 
             if (found != NULL) {
                 char command[512];
                 found += strlen("Reminder:") + 1;
                 printf("Message reminder: %s\n", found);
+            
+                struct tm *local_time;
+                char formatted_date[100]; 
 
+                local_time = localtime(&t);
+
+                strftime(formatted_date, sizeof(formatted_date), "%B %d, %Y %I:%M %p", local_time);
+
+                printf("Formatted Date: %s\n", formatted_date);
+
+        //Do switch statement here for all the diff cases
                 if (date_found == 1) {
+                    printf("No date FOUND");
+                    if(time == 1) {
+
+                        printf("No date and time found");
+                        
+                        snprintf(command, sizeof(command),
+                             "osascript -e 'tell application \"Reminders\" to make new reminder at list \"Reminders\" "
+                             "with properties {name:\"%s\", due date:date \"%s\", body:\"%s\"}'",
+                             found, formatted_date, buffer);
+                    } else {
+                            printf("No date but time found");
+                    // TODO add time column is a time exists in message
+                    char extracted_time[50] = ""; 
+                    int start = time_match[0].rm_so;
+                    int end = time_match[0].rm_eo;
+                    int match_len = end - start;
+                    strncpy(extracted_time, message + start, match_len);
+                    extracted_time[match_len] = '\0';
+
+                                            printf("No date but time found");
+
+
                     snprintf(command, sizeof(command),
                              "osascript -e 'tell application \"Reminders\" to make new reminder at list \"Reminders\" "
-                             "with properties {name:\"%s\", body:\"%s\"}'",
-                             found, buffer);
+                             "with properties {name:\"%s\", due date:date (short date string of (current date) & \" %s\"), body:\"%s\"}'",
+                             found, extracted_time, buffer);
+                    }
+                        
                 } else {
-                    char extracted_date[50] = ""; 
+                                       char extracted_date[50] = ""; 
                     int start = match[0].rm_so;
                     int end = match[0].rm_eo;
                     int match_len = end - start;
 
                     strncpy(extracted_date, message + start, match_len);
+
+                    int year = local_time->tm_year + 1900;  // Get current year
+        
+    snprintf(formatted_date, sizeof(formatted_date), "%s/%d", extracted_date, year);
+
+
                     extracted_date[match_len] = '\0'; 
+
+                    printf("Formatted DATE: %s", formatted_date);
 
                     snprintf(command, sizeof(command),
                              "osascript -e 'tell application \"Reminders\" to make new reminder at list \"Reminders\" "
                              "with properties {name:\"%s\", due date:date \"%s\" ,body:\"%s\"}'",
-                             found, extracted_date, buffer);
+                             found, formatted_date, buffer);
                 }
 
                 system(command);
                 mark_message_as_read(db, message_id);
             }
 
-            regfree(&regex); // Free memory
+            regfree(&regex);
         }
     }
 
