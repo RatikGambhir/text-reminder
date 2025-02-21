@@ -28,7 +28,9 @@ int regex_contains_date(char *message, regmatch_t *match, regex_t regex) {
 int regex_contains_time(char *message, regmatch_t *match, regex_t regex) {
      int regex_result;
 
-            const char *pattern = "[0-9]{1,2}(:)?([0-9]{2})?(\\s*)?[AaPp][Mm]";
+         //   const char *pattern = "[0-9]{1,2}(:)?([0-9]{2})?(\\s*)?[AaPp][Mm]";
+
+         const char *pattern = "([0-9]{1,2}(:?[0-9]{2})?\\s?[AaPp][Mm])"
 
             regex_result = regcomp(&regex, pattern, REG_EXTENDED | REG_ICASE);
             if (regex_result) {
