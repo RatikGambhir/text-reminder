@@ -5,6 +5,10 @@
 #include <stdlib.h>
 #include <regex.h>
 
+#define HAS_DATE 1
+#define HAS_TIME 2
+#define HAS_NOTES 3
+
 // finding if the reminder message contains a date, if so, we add this date to the reminder
 int regex_contains_date(char *message, regmatch_t *match, regex_t regex) {
      int regex_result;
@@ -25,23 +29,45 @@ int regex_contains_date(char *message, regmatch_t *match, regex_t regex) {
 }
 
 // time regex. Finding if the text contains 8:30PM or 830PM format. PM or AM must be directly after the time
-int regex_contains_time(char *message, regmatch_t *match, regex_t regex) {
+int regex_contains_time(char *message, regmatch_t *match, regex_t *regex) {
      int regex_result;
 
-         //   const char *pattern = "[0-9]{1,2}(:)?([0-9]{2})?(\\s*)?[AaPp][Mm]";
 
-         const char *pattern = "([0-9]{1,2}(:?[0-9]{2})?\\s?[AaPp][Mm])"
+         const char *pattern = "([0-9]{1,2}(:[0-9]{2})?[ ]*[AaPp][Mm])";
 
-            regex_result = regcomp(&regex, pattern, REG_EXTENDED | REG_ICASE);
+            regex_result = regcomp(regex, pattern, REG_EXTENDED | REG_ICASE);
             if (regex_result) {
                 printf("Could not compile regex\n");
                 return 0;
             }
 
         
-            return regexec(&regex, message, 1, match, 0);
+            return regexec(regex, message, 1, match, 0);
 
 
+}
+
+// Time regex function
+int regex_contains_time_test(const char *message, regmatch_t *match, regex_t *regex) {
+    int regex_result;
+
+    // Corrected regex pattern (no unnecessary parentheses)
+    const char *pattern = "([0-9]{1,2}(:[0-9]{2})?[ ]*[AaPp][Mm])";
+
+    // Compile regex and store it in provided regex_t object
+    regex_result = regcomp(regex, pattern, REG_EXTENDED);
+    if (regex_result) {
+        printf("Could not compile regex\n");
+        return REG_NOMATCH; // Indicate failure
+    }
+
+    // Execute regex and store match result
+    int match_result = regexec(regex, message, 1, match, 0);
+
+    // Free regex memory after usage
+    regfree(regex);
+
+    return match_result; // Returns 0 if matched, REG_NOMATCH if not
 }
 
 //After we process a reminder message, we want to mark it as read so that we don't process a reminder message more than once
@@ -67,6 +93,25 @@ void mark_message_as_read(sqlite3 *db, int message_id) {
     sqlite3_finalize(stmt);
 }
 
+void process_reminder_command(const char *message) {
+            struct tm *local_time;
+            char formatted_date[100]; 
+
+            int has_date = regex_contains_date(message, match, regex);
+            int has_time = regex_contains_time(message, time_match, &time_regex);
+            int has_notes = strcasestr(message, "Notes:");
+            int condition = (date_found ?? HAS_DATE : 0) | (time ?? HAS_TIME : 0) | (notes ?? HAS_NOTES : 0);
+
+            local_time = localtime(&t);
+
+            strftime(formatted_date, sizeof(formatted_date), "%B %d, %Y %I:%M %p", local_time);
+
+            // switch(condition) {
+            //     case 0:
+
+            // }
+}
+
 int main() {
     sqlite3 *db;
     sqlite3_stmt *stmt;
@@ -76,7 +121,6 @@ int main() {
     regex_t time_regex;
     regmatch_t match[1]; // Stores the position of the match
     regmatch_t time_match[1]; // Stores the position of the match
-
 
     time(&t); // Get current time
 
@@ -121,7 +165,7 @@ int main() {
                 fprintf(stderr, "Memory allocation failed\n");
                 continue; // Skip this row if allocation fails
             }
-
+            printf("Time matches regex: %d\n", result);
             printf("Message from number: %s\n", (const char *)number);
             strcpy(message, (char *)text);
 
@@ -148,7 +192,7 @@ int main() {
             const char *found = strcasestr(message, "Reminder:");
 
             int date_found = regex_contains_date(message, match, regex);
-            int time = regex_contains_time(message, time_match, time_regex);
+            int time = regex_contains_time(message, time_match, &time_regex);
 
             if (found != NULL) {
                 char command[512];
