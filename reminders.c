@@ -182,6 +182,7 @@ void gen_reminder_command(const char *message, char *contact, const char *remind
                     (reminder_notes != NULL ? HAS_NOTES : 0);
 
     printf("Condition: %d\n", condition);
+    printf("NOTES?: %s", reminder_notes);
 
     time(&raw_time);
     local_time = localtime(&raw_time);
@@ -369,7 +370,7 @@ int main() {
 
     char reminder_command[512];
 
-    char *mock_message = "Reminder: Get Apples at whole foods from the silly goose amanda Notes: Make sure to get the organic ones";
+    char *mock_message = "Reminder: Get Apples at whole foods from the silly goose amanda 8/4/2025 7:30 PM. Notes: Make sure they are silly goose ones";
     const char *reminder_message = strcasestr(mock_message, "Reminder:");
 
     reminder_message += strlen("Reminder:") + 1;
@@ -397,11 +398,7 @@ int main() {
 
     time(&t); // Get current time
 
-    // char *mock = "9:30 PM";
-
-    // int has_time_mock = evaluate_regex(mock, time_match_pointer_1, time_regex_1, TIME_REGEX);
-
-    // printf("has time mock!!!: %d", has_time_mock);
+   
 
 
     rc = sqlite3_open("/Users/ratikgambhir/Library/Messages/chat.db", &db);
