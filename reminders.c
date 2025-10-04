@@ -140,6 +140,8 @@ int prepare_sqlite_query(char *sql_query, sqlite3 *db, sqlite3_stmt *stmt) {
 
 }
 
+//TODO: Implement a generic date time formatter that takes in date and time strings and outputs a formatted date time string
+
 void format_date_time(char *date, char *time, char *formatted_date_time, size_t output_size) {
     struct tm datetime = {0};
     char temp_datetime[100];
@@ -364,9 +366,7 @@ int main() {
     sqlite3_stmt *stmt;
     int rc;
     time_t t; 
-    regex_t date_regex_1, time_regex_1;
-    regmatch_t date_match_pointer_1[1];
-    regmatch_t time_match_pointer_1[1];
+
 
     char reminder_command[512];
 
