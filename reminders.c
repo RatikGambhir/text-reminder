@@ -34,13 +34,21 @@ int regex_contains_date(char *message, regmatch_t *match, regex_t regex) {
 /**
  * Evaluates a regex pattern on a given source text.
  */
-int evaluate_regex(const char *source_text, regmatch_t *match, regex_t regex, const char *regex_pattern) {
-    int regex_result = regcomp(&regex, regex_pattern, REG_EXTENDED);
-    if (regex_result) {
-        printf("Could not compile regex: %s\n", regex_pattern);
-        return 0;
-    }
-    return regexec(&regex, source_text, 1, match, 0);
+// int evaluate_regex(const char *source_text, regmatch_t *match, regex_t regex, const char *regex_pattern) {
+//     int regex_result = regcomp(&regex, regex_pattern, REG_EXTENDED);
+//     if (regex_result) {
+//         printf("Could not compile regex: %s\n", regex_pattern);
+//         return 0;
+//     }
+//     return regexec(&regex, source_text, 1, match, 0);
+// }
+
+int evaluate_regex(const char *src, regmatch_t *match, regex_t *re, const char *pattern) {
+    if (regcomp(re, pattern, REG_EXTENDED | REG_ICASE)) return -1;
+    int rc = regexec(re, src, 1, match, 0);
+    if (rc == 0) return 1;           // match
+    if (rc == REG_NOMATCH) return 0; // no match
+    return -1;
 }
 
 
@@ -92,30 +100,42 @@ void mark_message_as_read(sqlite3 *db, int message_id) {
 
 
 void extract_regex(regmatch_t *match, const char *message, char *extracted_regex) {
+
+    // Debug: print offsets first
+    printf("[extract_regex] rm_so = %d, rm_eo = %d\n", (int)match[0].rm_so, (int)match[0].rm_eo);
+
+    // Check for invalid values before using them
+    if (match[0].rm_so == -1 || match[0].rm_eo == -1) {
+        printf("[extract_regex] No valid match found.\n");
+        extracted_regex[0] = '\0';
+        return;
+    }
     int start = match[0].rm_so;
     int end = match[0].rm_eo;
     int match_len = end - start;
+
+    printf("[extract_regex] start=%d end=%d len=%d substring='%.*s'\n",
+           start, end, match_len, match_len, message + start);
     strncpy(extracted_regex, message + start, match_len);
     extracted_regex[match_len] = '\0';  // Properly null terminate the string
 }
 
-void get_contact_name(const unsigned char *number, char *contact_buffer, char *command) {
-        
+void get_contact_name(const char *number, char *contact_buffer, char *command) {
+    snprintf(command, 256,
+             "osascript -e 'tell application \"Contacts\" to get name of first person whose value of phones contains \"%s\"'",
+             number);
 
-            //Ideally here we would like to query the sqlite db that has contact info, but ICloud was giving me trouble
-            snprintf(command, sizeof(command),
-                     "osascript -e 'tell application \"Contacts\" to get name of first person whose value of phones contains \"%s\"'",
-                     (const char *)number);
+    FILE *fp = popen(command, "r");
+    if (fp == NULL) {
+        printf("Failed to run AppleScript\n");
+        return;
+    }
 
-            FILE *fp = popen(command, "r");
-            if (fp == NULL) {
-                printf("Failed to run AppleScript\n");
-               
-            }
+    if (fgets(contact_buffer, 256, fp) == NULL) {
+        strcpy(contact_buffer, number);
+    }
 
-            if (fgets(contact_buffer, sizeof(contact_buffer), fp) == NULL) {
-                strcpy(contact_buffer, number); // Copy the string
-            } 
+    pclose(fp);
 }
 
 int prepare_sqlite_query(char *sql_query, sqlite3 *db, sqlite3_stmt *stmt) {
@@ -173,25 +193,28 @@ void gen_reminder_command(const char *message, char *contact, const char *remind
     time_t raw_time;
     time_t t;
 
-    printf("Message: %s\n", message);
+   // Compute condition flags
+regex_t date_re, time_re;
+regmatch_t date_m[1], time_m[1];
 
-    int has_date = evaluate_regex(message, date_match_pointer, date_regex, DATE_REGEX);
-    int has_time = evaluate_regex(message, time_match_pointer, time_regex, TIME_REGEX);
-    const char *reminder_notes = strcasestr(message, "Notes:");
+int has_date = evaluate_regex(message, date_m, &date_re, DATE_REGEX);
+int has_time = evaluate_regex(message, time_m, &time_re, TIME_REGEX);
+const char *reminder_notes = strcasestr(message, "Notes:");
 
-    int condition = (has_date != 1 ? HAS_DATE : 0) | 
-                    (has_time != 1 ? HAS_TIME : 0) | 
-                    (reminder_notes != NULL ? HAS_NOTES : 0);
+int condition = (has_date == 1 ? HAS_DATE : 0) |
+                (has_time == 1 ? HAS_TIME : 0) |
+                (reminder_notes ? HAS_NOTES : 0);
 
-    printf("Condition: %d\n", condition);
-    printf("NOTES?: %s", reminder_notes);
+regfree(&date_re);
+regfree(&time_re);
+
+
 
     time(&raw_time);
     local_time = localtime(&raw_time);
     strftime(formatted_current_date, sizeof(formatted_current_date), "%m/%d/%Y", local_time);
     strftime(formatted_current_time, sizeof(formatted_current_time), "%I:%M:%S %p", local_time);
-    printf("current date: %s\n", formatted_current_date);
-    printf("current time: %s\n", formatted_current_time);
+
 
     switch (condition) {
         case 0:
@@ -327,6 +350,7 @@ void gen_reminder_command(const char *message, char *contact, const char *remind
                      "osascript -e 'tell application \"Reminders\" to make new reminder at list \"Reminders\" "
                      "with properties {name:\"%s\", due date:date \"%s\", body:\"%s\"}'",
                      reminder_content, formatted_date, notes);
+                printf("Command: %s", command);
             break;
         }
 
@@ -339,15 +363,18 @@ void gen_reminder_command(const char *message, char *contact, const char *remind
 
             extract_regex(date_match_pointer, message, extracted_date);
             extract_regex(time_match_pointer, message, extracted_time);
-
             if (strlen(extracted_date) <= 5) {
                 int year = local_time->tm_year + 1900;  
                 snprintf(formatted_date, sizeof(formatted_date), "%s/%d %s", extracted_date, year, extracted_time);
+                printf("Formatted Date (in if): %s", formatted_date);
             } else {
                 snprintf(formatted_date, sizeof(formatted_date), "%s %s", extracted_date, extracted_time);
+                                printf("Formatted Date (in if): %s", formatted_date);
+
             }
 
             snprintf(notes, sizeof(notes), "From %s: %s", contact, reminder_notes += strlen("Notes:") + 1);
+                printf("Formatted Date (not in if): %s", formatted_date);
 
             snprintf(command, command_size,
                      "osascript -e 'tell application \"Reminders\" to make new reminder at list \"Reminders\" "
