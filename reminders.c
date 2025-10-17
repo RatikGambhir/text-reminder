@@ -114,8 +114,10 @@ void extract_regex(regmatch_t *match, const char *message, char *extracted_regex
     int end = match[0].rm_eo;
     int match_len = end - start;
 
-    printf("[extract_regex] start=%d end=%d len=%d substring='%.*s'\n",
-           start, end, match_len, match_len, message + start);
+    printf("[extract_regex] rm_so=%d rm_eo=%d matched='%.*s'\n",
+       (int)match[0].rm_so, (int)match[0].rm_eo,
+       (int)(match[0].rm_eo - match[0].rm_so),
+       message + match[0].rm_so);
     strncpy(extracted_regex, message + start, match_len);
     extracted_regex[match_len] = '\0';  // Properly null terminate the string
 }
@@ -193,20 +195,14 @@ void gen_reminder_command(const char *message, char *contact, const char *remind
     time_t raw_time;
     time_t t;
 
-   // Compute condition flags
-regex_t date_re, time_re;
-regmatch_t date_m[1], time_m[1];
 
-int has_date = evaluate_regex(message, date_m, &date_re, DATE_REGEX);
-int has_time = evaluate_regex(message, time_m, &time_re, TIME_REGEX);
+int has_date = evaluate_regex(message, date_match_pointer, &date_regex, DATE_REGEX);
+int has_time = evaluate_regex(message, time_match_pointer, &time_regex, TIME_REGEX);
 const char *reminder_notes = strcasestr(message, "Notes:");
 
 int condition = (has_date == 1 ? HAS_DATE : 0) |
                 (has_time == 1 ? HAS_TIME : 0) |
                 (reminder_notes ? HAS_NOTES : 0);
-
-regfree(&date_re);
-regfree(&time_re);
 
 
 
