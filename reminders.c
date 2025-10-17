@@ -189,7 +189,7 @@ void extract_reminder_content(
     const char *message,
     regmatch_t *match_pointer
 ) {
-    
+
 }
 
 void gen_reminder_command(const char *message, char *contact, const char *reminder_content, char *command, size_t command_size) {
@@ -362,7 +362,8 @@ int condition = (has_date == 1 ? HAS_DATE : 0) |
             char notes[200];
             char formatted_date[40];
             char extracted_time[20] = ""; 
-            char extracted_date[20] = ""; 
+            char extracted_date[20] = "";
+            char formatted_reminder_content[256] = ""; 
 
             extract_regex(date_match_pointer, message, extracted_date);
             extract_regex(time_match_pointer, message, extracted_time);
