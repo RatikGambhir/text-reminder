@@ -185,6 +185,13 @@ void format_date_time(char *date, char *time, char *formatted_date_time, size_t 
     strftime(formatted_date_time, output_size, "%m/%d/%Y %I:%M %p", &datetime);
 }
 
+void extract_reminder_content(
+    const char *message,
+    regmatch_t *match_pointer
+) {
+    
+}
+
 void gen_reminder_command(const char *message, char *contact, const char *reminder_content, char *command, size_t command_size) {
     struct tm *local_time;
     char formatted_current_date[50];
