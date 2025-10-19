@@ -122,7 +122,7 @@ void extract_regex(regmatch_t *match, const char *message, char *extracted_regex
     extracted_regex[match_len] = '\0';  // Properly null terminate the string
 }
 
-void get_contact_name(const char *number, char *contact_buffer, char *command) {
+void get_contact_name(const unsigned char *number, char *contact_buffer, char *command) {
     snprintf(command, 256,
              "osascript -e 'tell application \"Contacts\" to get name of first person whose value of phones contains \"%s\"'",
              number);
@@ -134,7 +134,7 @@ void get_contact_name(const char *number, char *contact_buffer, char *command) {
     }
 
     if (fgets(contact_buffer, 256, fp) == NULL) {
-        strcpy(contact_buffer, number);
+        strcpy(contact_buffer, (const char *)number);
     }
 
     pclose(fp);
@@ -399,18 +399,18 @@ int main() {
     time_t t; 
 
 
-    char reminder_command[512];
+    // char reminder_command[512];
 
-    char *mock_message = "Reminder: Get Apples at whole foods from the silly goose amanda 8/4/2025 7:30 PM. Notes: Make sure they are silly goose ones";
-    const char *reminder_message = strcasestr(mock_message, "Reminder:");
+    // char *mock_message = "Reminder: Get Apples at whole foods from the silly goose amanda 8/4/2025 7:30 PM. Notes: Make sure they are silly goose ones";
+    // const char *reminder_message = strcasestr(mock_message, "Reminder:");
 
-    reminder_message += strlen("Reminder:") + 1;
+    // reminder_message += strlen("Reminder:") + 1;
 
-    gen_reminder_command(mock_message, "Ratik Gambhir", reminder_message, reminder_command, sizeof(reminder_command));
+    // gen_reminder_command(mock_message, "Ratik Gambhir", reminder_message, reminder_command, sizeof(reminder_command));
 
-    printf("Reminder Command: %s", reminder_command);   
+    // printf("Reminder Command: %s", reminder_command);   
 
-    system(reminder_command);
+    // system(reminder_command);
     
 
 //          //  get_contact_name(number, contact_buffer, contact_command);
@@ -464,39 +464,39 @@ int main() {
         int message_id = sqlite3_column_int(stmt, 1);
         const unsigned char *number = sqlite3_column_text(stmt, 2);
 
-        // if (text) {
-        //     size_t text_len = strlen((const char *)text);
-        //     char *message = (char *)malloc(text_len + 1);
-        //     char contact_buffer[64];
-        //     char contact_command[256];
+        if (text) {
+            size_t text_len = strlen((const char *)text);
+            char *message = (char *)malloc(text_len + 1);
+            char contact_buffer[64];
+            char contact_command[256];
 
-        //     if (message == NULL) {
-        //         fprintf(stderr, "Memory allocation failed\n");
-        //         continue; // Skip this row if allocation fails
-        //     }
+            if (message == NULL) {
+                fprintf(stderr, "Memory allocation failed\n");
+                continue;
+            }
        
-        //     strcpy(message, (char *)text);
+            strcpy(message, (char *)text);
 
-        //     char *mock_message = "Reminder: Get Apples at whole foods 9:30 PM";
 
-        //  //  get_contact_name(number, contact_buffer, contact_command);
+          get_contact_name(number, contact_buffer, contact_command);
+            printf("Number: %s", (const char*) number);
+          printf("Message: %s\n", message);
 
-        //     const char *reminder_message = strcasestr(mock_message, "Reminder:");
+            const char *reminder_message = strcasestr(message, "Reminder:");
 
-        //     if (reminder_message != NULL) {
-        //         char reminder_command[512];
-        //         char *contact_mock = "Ratik Gambhir";
-        //         reminder_message += strlen("Reminder:") + 1;
+            if (reminder_message != NULL) {
+                char reminder_command[512];
+                reminder_message += strlen("Reminder:") + 1;
               
-        //         gen_reminder_command(mock_message, contact_buffer, reminder_message, reminder_command, sizeof(reminder_command));
+                gen_reminder_command(message, contact_buffer, reminder_message, reminder_command, sizeof(reminder_command));
 
-        //         printf("Reminder Command: %s", reminder_command);
+                printf("Reminder Command: %s", reminder_command);
 
-        //         system(reminder_command);
-        //         mark_message_as_read(db, message_id);
-        //     }
+                system(reminder_command);
+                mark_message_as_read(db, message_id);
+            }
 
-        // }
+        }
     }
 
     sqlite3_finalize(stmt);
