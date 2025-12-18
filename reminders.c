@@ -12,8 +12,7 @@
 const char *DATE_REGEX = "[0-9]{1,2}/[0-9]{1,2}(/[0-9]{4})?";
 const char *TIME_REGEX = "([0-9]{1,4}(:[0-9]{2})?[ ]*[AaPp][Mm])";
 
-// finding if the reminder message contains a date, if so, we add this date to
-// the reminder
+
 int regex_contains_date(char *message, regmatch_t *match, regex_t regex) {
   int regex_result;
 
@@ -40,8 +39,7 @@ int evaluate_regex(const char *src, regmatch_t *match, regex_t *re,
   return -1;
 }
 
-// time regex. Finding if the text contains any of the following formats: 830
-// PM, 830PM, 8:30PM, 8:30 PM, 8 PM, 8PM (lowercase AM and PM is also allowed)
+
 int regex_contains_time(char *message, regmatch_t *match, regex_t *regex) {
   int regex_result;
 
@@ -56,9 +54,7 @@ int regex_contains_time(char *message, regmatch_t *match, regex_t *regex) {
   return regexec(regex, message, 1, match, 0);
 }
 
-/**
- * Marks a message as read in the SQLite database.
- */
+
 void mark_message_as_read(sqlite3 *db, int message_id) {
   sqlite3_stmt *stmt;
   const char *sql = "UPDATE message SET is_read = 1 WHERE ROWID = ?;";
@@ -84,7 +80,6 @@ void mark_message_as_read(sqlite3 *db, int message_id) {
 
 void extract_regex(regmatch_t *match, const char *message,
                    char *extracted_regex) {
-  // Check for invalid values before using them
   if (match[0].rm_so == -1 || match[0].rm_eo == -1) {
     extracted_regex[0] = '\0';
     return;
@@ -94,7 +89,7 @@ void extract_regex(regmatch_t *match, const char *message,
   int match_len = end - start;
 
   strncpy(extracted_regex, message + start, match_len);
-  extracted_regex[match_len] = '\0'; // Properly null terminate the string
+  extracted_regex[match_len] = '\0';
 }
 
 void get_contact_name(const unsigned char *number, char *contact_buffer,
@@ -138,31 +133,7 @@ int prepare_sqlite_query(char *sql_query, sqlite3 *db, sqlite3_stmt *stmt) {
   return rc;
 }
 
-// TODO: Implement a generic date time formatter that takes in date and time
-// strings and outputs a formatted date time string
 
-void format_date_time(char *date, char *time, char *formatted_date_time,
-                      size_t output_size) {
-  struct tm datetime = {0};
-  char temp_datetime[100];
-  snprintf(temp_datetime, sizeof(temp_datetime), "%s %s", date, time);
-
-  if (date == NULL && time == NULL) {
-    // add current date time
-
-  } else if (date == NULL) {
-    // add current date with given time
-  } else if (time == NULL) {
-    // add given date with current time
-  } else {
-    // combine given date and time
-  }
-  printf("temp datetime: %s\n", temp_datetime);
-
-  strftime(formatted_date_time, output_size, "%m/%d/%Y %I:%M %p", &datetime);
-}
-
-void extract_reminder_content(const char *message, regmatch_t *match_pointer) {}
 
 void gen_reminder_command(const char *message, char *contact,
                           const char *reminder_content, char *command,
@@ -392,7 +363,7 @@ int main() {
   time_t t;
 
 
-  time(&t); // Get current time
+  time(&t);
 
   rc = sqlite3_open("/Users/ratikgambhir/Library/Messages/chat.db", &db);
   if (rc != SQLITE_OK) {

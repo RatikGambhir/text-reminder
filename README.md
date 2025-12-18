@@ -1,2 +1,2 @@
-# text-reminder
+# Text Reminder
 Text Reminder Automation
